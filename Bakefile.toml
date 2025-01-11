@@ -1,0 +1,7 @@
+[targets.main]
+artifacts = ['bin/bake']
+deps = ['**/*.go']
+command = """
+mkdir -p bin
+go build -o bin/bake .
+"""
