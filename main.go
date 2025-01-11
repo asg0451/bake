@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	// TODO: set log level to info unless verbose, in utils like here https://stackoverflow.com/questions/76970895/change-log-level-of-go-lang-slog-in-runtime
 	ctx, log, opts, err := utils.StdSetup[options.Opts]()
 	if err != nil {
 		os.Exit(1)
@@ -47,9 +48,9 @@ func run(ctx context.Context, log *slog.Logger, opts options.Opts) error {
 }
 
 // syntax similar to make but less shit. what are the features cases i want?
-// - basic dags, with time based caching
-// - globstar paths
-// - what you can do with builtin variables
-// 	- protobuf style generation
-// - parallelism
-// - more than one target?
+// - [ ] basic dags, with time based caching
+// - [X] globstar paths
+// - [ ] what you can do with builtin variables
+// 	- [ ] protobuf style generation
+// - [ ] parallelism
+// -  more than one target?

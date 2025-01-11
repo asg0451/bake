@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"go.coldcutz.net/bake/bakefile"
@@ -57,10 +59,46 @@ func (e *Executor) Exec(ctx context.Context) error {
 	}
 	e.log.Debug("processed deps and aftifacts", "deps", allDeps, "artifacts", allArtifacts, "mtime", artifactModTime)
 
-	if artifactModTime.After(depsModTime) {
-		e.log.Debug("artifacts are up to date")
+	if !artifactModTime.IsZero() && artifactModTime.Before(depsModTime) {
+		e.log.Debug("artifacts are up to date", "artifact_mtime", artifactModTime, "deps_mtime", depsModTime)
+		return nil
 	}
 
+	if err := e.runCmd(ctx); err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
+	e.log.Debug("command finished successfully")
+	return nil
+}
+
+func (e *Executor) runCmd(ctx context.Context) error {
+	tf, err := os.CreateTemp("", "bakefile-*.sh")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	defer os.Remove(tf.Name())
+
+	// write the command to the temp file
+	_, err = fmt.Fprintf(tf, `
+#!/bin/bash
+set -euo pipefail
+%s
+	`, strings.TrimSpace(e.target.Command))
+	if err != nil {
+		return fmt.Errorf("writing command to temp file: %w", err)
+	}
+
+	bashFlags := "-l"
+	if e.opts.Verbose {
+		bashFlags += "x"
+	}
+	cmd := exec.CommandContext(ctx, "/bin/bash", bashFlags, tf.Name())
+	cmd.Env = append(os.Environ(), "BAKEFILE=1")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running command: %w", err)
+	}
 	return nil
 }
 
