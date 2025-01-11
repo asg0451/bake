@@ -1,10 +1,12 @@
+[targets.ensure_build_dir]
+command = "mkdir -p bin"
+
 [targets.main]
 artifacts = ['bin/bake']
 # TODO: deps that are other targets
-deps = ['**/*.go']
+deps = ['**/*.go', 'target:ensure_build_dir']
 command = """
 # TODO: how to pass the dep names into here, if required?
 # maybe just put them in a bash array ${deps[@]}
-mkdir -p bin
 go build -o bin/bake .
 """

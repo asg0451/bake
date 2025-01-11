@@ -37,7 +37,20 @@ func New(config bakefile.Config, targetName string, opts options.Opts, log *slog
 }
 
 func (e *Executor) Exec(ctx context.Context) error {
-	allDeps, err := globAll(e.target.Deps)
+	targetDeps, fileDeps := []string{}, []string{}
+	for _, dep := range e.target.Deps {
+		if strings.HasPrefix(dep, "target:") {
+			targetDeps = append(targetDeps, strings.TrimPrefix(dep, "target:"))
+		} else {
+			fileDeps = append(fileDeps, dep)
+		}
+	}
+
+	// TODO: do something with targetDeps
+	// need to separate planning from execution and build a dag
+	e.log.Debug("raw deps", "tdeps", targetDeps, "fdeps", fileDeps)
+
+	myDeps, err := globAll(fileDeps)
 	if err != nil {
 		return fmt.Errorf("globbing deps: %w", err)
 	}
@@ -45,7 +58,7 @@ func (e *Executor) Exec(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("globbing artifacts: %w", err)
 	}
-	if len(allDeps) == 0 {
+	if len(myDeps) == 0 {
 		return fmt.Errorf("no deps found")
 	}
 
@@ -53,11 +66,11 @@ func (e *Executor) Exec(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("getting artifact mtime: %w", err)
 	}
-	depsModTime, err := minMtime(allDeps)
+	depsModTime, err := minMtime(myDeps)
 	if err != nil {
 		return fmt.Errorf("getting deps mtime: %w", err)
 	}
-	e.log.Debug("processed deps and aftifacts", "deps", allDeps, "artifacts", allArtifacts, "mtime", artifactModTime)
+	e.log.Debug("processed deps and aftifacts", "deps", myDeps, "artifacts", allArtifacts, "mtime", artifactModTime)
 
 	if !artifactModTime.IsZero() && artifactModTime.Before(depsModTime) {
 		e.log.Debug("artifacts are up to date", "artifact_mtime", artifactModTime, "deps_mtime", depsModTime)
@@ -79,6 +92,8 @@ func (e *Executor) runCmd(ctx context.Context) error {
 	defer os.Remove(tf.Name())
 
 	// write the command to the temp file
+	// TODO: text/template to add BAKEDEPS as a bash array
+	// https://pkg.go.dev/text/template
 	_, err = fmt.Fprintf(tf, `
 #!/bin/bash
 set -euo pipefail
